@@ -2,10 +2,10 @@ CC = gcc
 #DFLAG = -D__VERBOSE__
 
 all:
-	$(CC) src/tcasm.c -std=c17 -Wall -O2 -o bin/tcasm $(DFLAG)
-	$(CC) src/tcsim.c -std=c17 -Wall -O2 -o bin/tcsim $(DFLAG)
 	mkdir -p tce
 	mkdir -p bin
+	$(CC) src/tcasm.c -std=c17 -Wall -O2 -o bin/tcasm $(DFLAG)
+	$(CC) src/tcsim.c -std=c17 -Wall -O2 -o bin/tcsim $(DFLAG)
 
 clean:
 	rm -rf bin/*
