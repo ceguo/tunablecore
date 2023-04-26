@@ -5,7 +5,9 @@
 
 struct Tunable
 {
-    // Branch predictor initial guess: 0 or 1
+    // Division algorithm: [0] long division [1] restoring [2] SRT [3] Newton–Raphson 
+    uint8_t div_algo;
+    // Branch predictor initial guess: 0..1
     uint8_t bp_init_guess;
     // Branch predictor tolorance before reversing decision: 0..+Inf
     uint32_t bp_wrong_tol;
@@ -14,8 +16,6 @@ struct Tunable
 
 int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
 {
-    // Maximum string length
-    const uint32_t lsmax = 256;
     // Word length
     const uint8_t ws = 4;
     // Number of registers
@@ -37,11 +37,19 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
     // Branch predictor
     uint8_t bp_guess = pt->bp_init_guess;
     uint32_t bp_wrong_count = 0;
+    int bp_stall = 0;
+
+
+    // Division
+    int div_stall = 0;
+    int div_stall_list[] = {5, 3, 1, 0};
 
     // Intrepretation
     while (bsp < bsize)
     {
         int stall = 0;
+        div_stall = 0;
+        bp_stall = 0;
         #ifdef __VERBOSE__
         char first[lsmax];
         #endif
@@ -94,6 +102,7 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
                     {
                         r[riz] = r[rix] / r[riy];
                     }
+                    div_stall = div_stall_list[pt->div_algo];
                     break;
                 case 0b00100000:
                     #ifdef __VERBOSE__
@@ -111,6 +120,7 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
                     #ifdef __VERBOSE__
                     strcpy(first, "unknown");
                     #endif
+                    break;
             }
         }
         else if (itype == 1)
@@ -141,11 +151,11 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
                     #ifdef __VERBOSE__
                     strcpy(first, "unknown");
                     #endif
+                    break;
             }
         }
 
         // Branch predictor
-        int bp_stall = 0;
         if (bp_active)
         {
             if (bp_guess == take_branch)
@@ -167,7 +177,7 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
         }
         bsp = bsp + ws * (take_branch ? imm : 1);
         
-        stall = bp_stall;
+        stall = bp_stall > div_stall ? bp_stall : div_stall;
         ncyc += (1 + stall);
         
         #ifdef __VERBOSE__
@@ -196,6 +206,7 @@ int main(int argc, char *argv[]) {
 
     // Tunable parameters (hard-coded)
     struct Tunable tunable;
+    tunable.div_algo = 2;
     tunable.bp_init_guess = 0;
     tunable.bp_wrong_tol = 4;
 

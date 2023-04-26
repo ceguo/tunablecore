@@ -1,6 +1,9 @@
+CC = gcc
+#DFLAG = -D__VERBOSE__
+
 all:
-	clang src/tcasm.c -std=c17 -Wall -O2 -o bin/tcasm -D__VERBOSE__
-	clang src/tcsim.c -std=c17 -Wall -O2 -o bin/tcsim -D__VERBOSE__
+	$(CC) src/tcasm.c -std=c17 -Wall -O2 -o bin/tcasm $(DFLAG)
+	$(CC) src/tcsim.c -std=c17 -Wall -O2 -o bin/tcsim $(DFLAG)
 	mkdir -p tce
 	mkdir -p bin
 
