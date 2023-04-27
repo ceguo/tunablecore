@@ -1,5 +1,5 @@
 CC = gcc
-#DFLAG = -D__VERBOSE__
+DFLAG = -D__VERBOSE__
 
 all:
 	mkdir -p tce

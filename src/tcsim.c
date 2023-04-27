@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#define nreg 16
+#define lsmax 16
 
 struct Tunable
 {
@@ -18,8 +20,6 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
 {
     // Word length
     const uint8_t ws = 4;
-    // Number of registers
-    const uint8_t nreg = 16;
 
     // Cycle count
     int ncyc = 0;

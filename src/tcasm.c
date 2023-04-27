@@ -3,9 +3,10 @@
 #include <string.h>
 #include <stdint.h>
 
-const uint32_t hmax = 53;
+#define hmax 53
+#define bmax 65536
+
 const uint32_t lsmax = 256;
-const uint32_t bmax = 65536;
 uint8_t hash_to_op[hmax];
 uint8_t hash_to_op_used[hmax];
 
