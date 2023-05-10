@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -13,7 +14,153 @@ struct Tunable
     uint8_t bp_init_guess;
     // Branch predictor tolorance before reversing decision: 0..+Inf
     uint32_t bp_wrong_tol;
+    // Cache: set ID width: 1..4
+    uint8_t cache_setid_width;
+    // Cache: line width: 1..4
+    uint8_t cache_line_width;
+    // Cache: number of ways: 1..16
+    uint8_t cache_n_ways;
 };
+
+
+// Data types
+typedef int32_t cell_t;
+typedef uint32_t memaddr_t;
+typedef char bool;
+
+typedef struct Memory Memory;
+struct Memory
+{
+    // Raw parameters
+    int addr_w;
+    int setid_w;
+    int line_w;
+    int n_ways;
+
+    // Sizes
+    int mem_sz;
+    int n_sets;
+    int line_sz;
+
+    // History
+    memaddr_t last_addr;
+
+    // Main memory
+    cell_t *mc;
+
+    // Cache
+    memaddr_t *line_tag;
+    bool *line_valid;
+    cell_t *cc;
+
+    // Status
+    bool cache_hit;
+};
+
+
+int memory_init(Memory *m, int addr_w, int setid_w, int line_w, int n_ways)
+{
+    m->addr_w = addr_w;
+    m->setid_w = setid_w;
+    m->line_w = line_w;
+    m->n_ways = n_ways;
+
+    m->mem_sz = 1 << addr_w;
+    m->n_sets = 1 << setid_w;
+    m->line_sz = 1 << line_w;
+
+    // Initialise main memory
+    m->mc = calloc(m->mem_sz, sizeof(cell_t));
+
+    // Initialise cache
+    m->line_tag = calloc((m->n_sets) * (m->n_ways), sizeof(memaddr_t));
+    m->line_valid = calloc((m->n_sets) * (m->n_ways), sizeof(bool));
+
+    return 0;
+}
+
+
+int cache_locate(Memory *m, memaddr_t addr)
+{
+    memaddr_t tag = (addr >> (m->line_w + m->setid_w));
+    memaddr_t setid = (addr >> m->line_w) & (m->n_sets - 1);
+    
+    m->last_addr = addr;
+
+    #ifdef __VERBOSE__
+    memaddr_t offset = addr & (m->line_sz - 1);
+    printf("A: %u T: %u S: %u O: %u", addr, tag, setid, offset);
+    #endif
+
+    // Match tag in specific tag
+    memaddr_t line_match = m->n_ways;
+    for (memaddr_t line_sel = 0; line_sel < m->n_ways; line_sel++)
+        if (m->line_valid[setid * m->n_ways + line_sel])
+            if (m->line_tag[setid * m->n_ways + line_sel] == tag)
+                line_match = line_sel;
+    
+    // Determine cache status
+    if (line_match < m->n_ways)
+    {
+        // Hit: increment line frequency
+        #ifdef __VERBOSE__
+        printf(" Hit\n");
+        #endif
+        m->cache_hit = 1;
+        return 1;
+    }
+    else
+    {
+        // Miss: random replacement
+        #ifdef __VERBOSE__
+        printf(" Miss\n");
+        #endif
+        m->cache_hit = 0;
+
+        memaddr_t line_least = rand()%(m->n_ways);
+        
+        m->line_tag[setid * m->n_ways + line_least] = tag;
+        m->line_valid[setid * m->n_ways + line_least] = 1;
+        return 0;
+    }
+
+    return -1;
+}
+
+
+void cache_inspect(Memory *m){
+    for (memaddr_t setid = 0; setid < m->n_sets; setid++)
+    {
+        printf("Set %u:", setid);
+        for (memaddr_t line_sel = 0; line_sel < m->n_ways; line_sel++)
+        {
+            printf(" %u", m->line_tag[setid * m->n_ways + line_sel]);
+        }
+        printf("\n");
+    }
+}
+
+cell_t memory_read(Memory *m, memaddr_t addr)
+{
+    cache_locate(m, addr);
+    if (addr < m->mem_sz)
+        return m->mc[addr];
+
+    return 0;
+}
+
+
+bool memory_write(Memory *m, memaddr_t addr, cell_t val)
+{
+    cache_locate(m, addr);
+    if (addr < m->mem_sz)
+    {
+        m->mc[addr] = val;
+        return 0;
+    }
+
+    return 1;
+}
 
 
 int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
@@ -209,6 +356,10 @@ int main(int argc, char *argv[]) {
     tunable.div_algo = 2;
     tunable.bp_init_guess = 0;
     tunable.bp_wrong_tol = 4;
+    tunable.cache_setid_width = 4;
+    tunable.cache_line_width = 2;
+    tunable.cache_n_ways = 3;
+
 
     if (argc < 2) {
         printf("Usage: %s filename\n", argv[0]);
