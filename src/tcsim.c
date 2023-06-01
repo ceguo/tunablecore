@@ -58,7 +58,7 @@ struct Memory
 };
 
 
-int memory_init(Memory *m, int addr_w, int setid_w, int line_w, int n_ways)
+int memory_init(Memory *m, cell_t *content, int addr_w, int setid_w, int line_w, int n_ways)
 {
     m->addr_w = addr_w;
     m->setid_w = setid_w;
@@ -70,7 +70,7 @@ int memory_init(Memory *m, int addr_w, int setid_w, int line_w, int n_ways)
     m->line_sz = 1 << line_w;
 
     // Initialise main memory
-    m->mc = calloc(m->mem_sz, sizeof(cell_t));
+    m->mc = content;
 
     // Initialise cache
     m->line_tag = calloc((m->n_sets) * (m->n_ways), sizeof(memaddr_t));
@@ -344,13 +344,6 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
 
 
 int main(int argc, char *argv[]) {
-    // Maximum code size
-    const uint32_t maxcs = 4096;
-    // Number of memory slots
-    const uint32_t nms = 32768;
-    // Main memory
-    int32_t mem[nms];
-
     // Tunable parameters (hard-coded)
     struct Tunable tunable;
     tunable.div_algo = 2;
@@ -360,6 +353,19 @@ int main(int argc, char *argv[]) {
     tunable.cache_line_width = 2;
     tunable.cache_n_ways = 3;
 
+    const uint32_t addr_w = 14;
+    // Maximum code size
+    const uint32_t maxcs = 4096;
+    // Number of memory slots
+    const uint32_t nms = 1 << addr_w;
+    // Memory content
+    cell_t *mc;
+    mc = calloc(nms, sizeof(cell_t));
+    // Cached data memory
+    Memory mem;
+
+    memory_init(&mem, mc, addr_w, tunable.cache_setid_width, tunable.cache_line_width, tunable.cache_n_ways);
+    srand(42);
 
     if (argc < 2) {
         printf("Usage: %s filename\n", argv[0]);
@@ -371,11 +377,13 @@ int main(int argc, char *argv[]) {
         printf("Error: could not open file %s\n", argv[1]);
         return 1;
     }
-    int32_t bsize = fread(mem, sizeof(uint8_t), maxcs, fp);
+    int32_t bsize = fread(mc, sizeof(uint8_t), maxcs, fp);
     fclose(fp);
 
     // Run simulation
-    int ncyc = simulate(mem, bsize, &tunable);
+    int ncyc = simulate(mc, bsize, &tunable);
     printf("%d\n", ncyc);
+    free(mc);
+
     return 0;
 }
