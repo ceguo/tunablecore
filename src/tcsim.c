@@ -12,11 +12,11 @@ struct Tunable
     uint8_t div_algo;
     // Branch predictor initial guess: 0..1
     uint8_t bp_init_guess;
-    // Branch predictor tolorance before reversing decision: 0..+Inf
+    // Branch predictor tolerance before reversing decision: 0..16
     uint32_t bp_wrong_tol;
-    // Cache: set ID width: 1..4
+    // Cache: set ID width: 1..5
     uint8_t cache_setid_width;
-    // Cache: line width: 1..4
+    // Cache: line width: 1..6
     uint8_t cache_line_width;
     // Cache: number of ways: 1..16
     uint8_t cache_n_ways;
@@ -163,8 +163,7 @@ bool memory_write(Memory *m, memaddr_t addr, cell_t val)
 }
 
 
-// int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
-int simulate(Memory *mem, int32_t bsize, struct Tunable *pt)
+int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
 {
     // Word length
     const uint8_t ws = 4;
@@ -179,7 +178,7 @@ int simulate(Memory *mem, int32_t bsize, struct Tunable *pt)
     r[nreg-1] = bsize;
 
     // Code (eadian-independent)
-    char *bs = (char*)mem->mc;
+    char *bs = (char*)mem;
     int bsp = 0;
     
     // Branch predictor
@@ -256,15 +255,13 @@ int simulate(Memory *mem, int32_t bsize, struct Tunable *pt)
                     #ifdef __VERBOSE__
                     strcpy(first, "load");
                     #endif
-                    // r[riz] = mem[r[rix] + r[riy]];
-                    r[riz] = memory_read(mem, r[rix] + r[riy]);
+                    r[riz] = mem[r[rix] + r[riy]];
                     break;
                 case 0b00100100:
                     #ifdef __VERBOSE__
                     strcpy(first, "store");
                     #endif
-                    // mem[r[rix] + r[riy]] = r[riz];
-                    memory_write(mem, r[rix] + r[riy], r[riz]);
+                    mem[r[rix] + r[riy]] = r[riz];
                     break;
                 default:
                     #ifdef __VERBOSE__
@@ -384,7 +381,7 @@ int main(int argc, char *argv[]) {
     fclose(fp);
 
     // Run simulation
-    int ncyc = simulate(&mem, bsize, &tunable);
+    int ncyc = simulate(mc, bsize, &tunable);
     printf("%d\n", ncyc);
     free(mc);
 
