@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 
 #define nreg 16
 #define lsmax 16
@@ -379,6 +380,38 @@ int main(int argc, char *argv[]) {
     }
     int32_t bsize = fread(mc, sizeof(uint8_t), maxcs, fp);
     fclose(fp);
+
+    for (int i = 2; i < argc; i++)
+    {
+        if (!strcmp(argv[i], "-d"))
+        {
+            if (argc < i + 2) {
+                printf("Error: configuration file not specified\n");
+                return 1;
+            }
+            FILE *cfg = fopen(argv[i+1], "r");
+            if (cfg == NULL) {
+                printf("Error: could not open configuration file %s\n", argv[i+1]);
+                return 1;
+            }
+            assert(fscanf(cfg, "%hhu", &tunable.div_algo) == 1);
+            assert(fscanf(cfg, "%hhu", &tunable.bp_init_guess) == 1);
+            assert(fscanf(cfg, "%u", &tunable.bp_wrong_tol) == 1);
+            assert(fscanf(cfg, "%hhu", &tunable.cache_setid_width) == 1);
+            assert(fscanf(cfg, "%hhu", &tunable.cache_line_width) == 1);
+            assert(fscanf(cfg, "%hhu", &tunable.cache_n_ways) == 1);
+            
+            printf("Division algorithm: %hhu\n", tunable.div_algo);
+            printf("BP initial guess: %hhu\n", tunable.bp_init_guess);
+            printf("BP reverse tolerance: %u\n", tunable.bp_wrong_tol);
+            printf("Cache set ID width: %hhu\n", tunable.cache_setid_width);
+            printf("Cache line width: %hhu\n", tunable.cache_line_width);
+            printf("Cache ways: %hhu\n", tunable.cache_n_ways);
+            fclose(cfg);
+        }
+    }
+
+
 
     // Run simulation
     int ncyc = simulate(mc, bsize, &tunable);
