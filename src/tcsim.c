@@ -6,6 +6,7 @@
 
 #define nreg 16
 #define lsmax 16
+#define maxstrlen 1024
 
 struct Tunable
 {
@@ -176,7 +177,7 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
     int32_t r[nreg] = {0};
 
     // OS: free memory start point saved to last register
-    r[nreg-1] = bsize;
+    r[nreg-1] = bsize / sizeof(uint32_t);
 
     // Code (eadian-independent)
     char *bs = (char*)mem;
@@ -354,6 +355,9 @@ int main(int argc, char *argv[]) {
     tunable.cache_line_width = 2;
     tunable.cache_n_ways = 3;
 
+    int dump_flag = 0;
+    char dump_file[maxstrlen];
+
     const uint32_t addr_w = 14;
     // Maximum code size
     const uint32_t maxcs = 4096;
@@ -383,7 +387,7 @@ int main(int argc, char *argv[]) {
 
     for (int i = 2; i < argc; i++)
     {
-        if (!strcmp(argv[i], "-d"))
+        if (!strcmp(argv[i], "-c"))
         {
             if (argc < i + 2) {
                 printf("Error: configuration file not specified\n");
@@ -409,14 +413,38 @@ int main(int argc, char *argv[]) {
             printf("Cache ways: %hhu\n", tunable.cache_n_ways);
             fclose(cfg);
         }
+
+        if (!strcmp(argv[i], "-d"))
+        {
+            if (argc < i + 2) {
+                printf("Error: dump file not specified\n");
+                return 1;
+            }
+            dump_flag = 1;
+            strcpy(dump_file, argv[i+1]);
+        }
     }
-
-
 
     // Run simulation
     int ncyc = simulate(mc, bsize, &tunable);
     printf("%d\n", ncyc);
     free(mc);
+
+
+    if (dump_flag == 1)
+    {
+        FILE *md = fopen(dump_file, "wt");
+        if (md == NULL) {
+            printf("Error: could not open memory dump file %s\n", dump_file);
+            return 1;
+        }
+        for (int i = 0; i < maxcs; i++)
+        {
+            fprintf(md, "%d %d\n", i, mc[i]);
+        }
+        fclose(md);
+    }
+
 
     return 0;
 }
