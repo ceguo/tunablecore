@@ -187,18 +187,19 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
     uint8_t bp_guess = pt->bp_init_guess;
     uint32_t bp_wrong_count = 0;
     int bp_stall = 0;
-
+    int div_stall = 0;
+    int cache_stall = 0;
 
     // Division
-    int div_stall = 0;
     int div_stall_list[] = {5, 3, 1, 0};
 
     // Intrepretation
     while (bsp < bsize)
     {
-        int stall = 0;
-        div_stall = 0;
         bp_stall = 0;
+        div_stall = 0;
+        cache_stall = 0;
+
         #ifdef __VERBOSE__
         char first[lsmax];
         #endif
@@ -325,9 +326,7 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
             }
         }
         bsp = bsp + ws * (take_branch ? imm : 1);
-        
-        stall = bp_stall > div_stall ? bp_stall : div_stall;
-        ncyc += (1 + stall);
+        ncyc += 1 + bp_stall + div_stall + cache_stall;
         
         #ifdef __VERBOSE__
         printf("%u: %s\t[%2hu %2hu %2hu] %6hd B%hhu (%d)\n", bsp, first, riz, rix, riy, imm, take_branch, ncyc);
@@ -385,6 +384,8 @@ int main(int argc, char *argv[]) {
     int32_t bsize = fread(mc, sizeof(uint8_t), maxcs, fp);
     fclose(fp);
 
+
+    // Process optional command-line arguments
     for (int i = 2; i < argc; i++)
     {
         if (!strcmp(argv[i], "-c"))
@@ -405,6 +406,7 @@ int main(int argc, char *argv[]) {
             assert(fscanf(cfg, "%hhu", &tunable.cache_line_width) == 1);
             assert(fscanf(cfg, "%hhu", &tunable.cache_n_ways) == 1);
             
+            printf("Parameters overriden\n");
             printf("Division algorithm: %hhu\n", tunable.div_algo);
             printf("BP initial guess: %hhu\n", tunable.bp_init_guess);
             printf("BP reverse tolerance: %u\n", tunable.bp_wrong_tol);
@@ -414,7 +416,29 @@ int main(int argc, char *argv[]) {
             fclose(cfg);
         }
 
-        if (!strcmp(argv[i], "-d"))
+        if (!strcmp(argv[i], "-i"))
+        {
+            if (argc < i + 2) {
+                printf("Error: dump file not specified\n");
+                return 1;
+            }
+            FILE *mi = fopen(argv[i+1], "r");
+            if (mi == NULL) {
+                printf("Error: could not open memory dump file %s\n", dump_file);
+                return 1;
+            }
+            char buf[maxstrlen];
+            while (fgets(buf, maxstrlen, mi))
+            {
+                int add, val;
+                assert(sscanf(buf, "%d%d", &add, &val)==2);
+                printf("%d %d\n", add, val);
+                mc[add] = val;
+            }
+            fclose(mi);
+        }
+
+        if (!strcmp(argv[i], "-o"))
         {
             if (argc < i + 2) {
                 printf("Error: dump file not specified\n");
@@ -428,8 +452,6 @@ int main(int argc, char *argv[]) {
     // Run simulation
     int ncyc = simulate(mc, bsize, &tunable);
     printf("%d\n", ncyc);
-    free(mc);
-
 
     if (dump_flag == 1)
     {
@@ -438,13 +460,16 @@ int main(int argc, char *argv[]) {
             printf("Error: could not open memory dump file %s\n", dump_file);
             return 1;
         }
-        for (int i = 0; i < maxcs; i++)
+        for (int i = 0; i < nms; i++)
         {
-            fprintf(md, "%d %d\n", i, mc[i]);
+            if (mc[i] != 0)
+            {
+                fprintf(md, "%d %d\n", i, mc[i]);
+            }
         }
         fclose(md);
     }
 
-
+    free(mc);
     return 0;
 }
