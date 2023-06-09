@@ -85,11 +85,11 @@ def randomised_search(repeats = None):
     ydata = []
     for i,l in enumerate(idc):
         cost = tcobj(probe.loc[[l]])
-        if best_cost > cost:
-            best_cost = cost;
+        if best_cost > cost[0]:
+            best_cost = cost[0];
             best_probe = probe.loc[[l]];
         xdata.append(i)
-        ydata.append(best_cost[0][0])
+        ydata.append(best_cost)
             
     return xdata, ydata, best_probe
 
