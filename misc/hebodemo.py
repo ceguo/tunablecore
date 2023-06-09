@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 # In[1]:
 
 
@@ -11,18 +8,8 @@ import random
 import matplotlib.pyplot as plt
 
 
-# from hebo.design_space.design_space import DesignSpace
-# from hebo.optimizers.hebo import HEBO
-
-def obj(params : pd.DataFrame) -> np.ndarray:
-    return ((params.values - 0.37)**2).sum(axis = 1).reshape(-1, 1)
-        
-# space = DesignSpace().parse([{'name' : 'x', 'type' : 'num', 'lb' : -3, 'ub' : 3}])
-# opt   = HEBO(space)
-# for i in range(5):
-    # rec = opt.suggest(n_suggestions = 4)
-    # opt.observe(rec, obj(rec))
-    # print('After %d iterations, best obj is %.2f' % (i, opt.y.min()))
+from hebo.design_space.design_space import DesignSpace
+from hebo.optimizers.hebo import HEBO
 
 
 # In[2]:
@@ -94,19 +81,40 @@ def randomised_search(repeats = None):
     return xdata, ydata, best_probe
 
 
-# In[13]:
+def hebo_search(repeats = None):
+    space = DesignSpace().parse(space_cfg)
+    opt = HEBO(space)
+    np.random.seed(42)
+    
+    hydata = []
+    nsug = 4
+    for i in range(repeats):
+        print('Iteration %d' % i)
+        print('    Generating probes')
+        rec = opt.suggest(n_suggestions = nsug)
+        print('    Evaluating')    
+        opt.observe(rec, tcobj(rec))
+        print('    Best PPA (cost) %.2f' % opt.y.min())
+        hydata += [opt.y.min()] * nsug
+    hxdata = list(range(len(hydata)))
+    return hxdata, hydata, opt
 
 
-nrep  = 1000
+nrep = 100
 xdata, ydata, best_probe = randomised_search(nrep)
-plt.figure(figsize=(10,6))
+hxdata, hydata, hbest_probe = hebo_search(20)
+
+plt.figure(figsize=(10,5))
 plt.xlim = ([0, nrep])
-# plt.yscale('')
+plt.xlabel('Number of evaluated designs')
+plt.ylabel('PPA indicator (cost)')
 plt.plot(xdata, ydata, label='Brute-force search')
+plt.plot(hxdata, hydata, label='ML-based optimisation (ML-opt)')
+plt.axhline(y = hbest_probe.y.min(), color = 'g', linestyle = '-', alpha=0.3, label='Best solution found by ML-opt')
 plt.legend()
+plt.tight_layout()
 plt.savefig('search.png')
 plt.show()
 plt.close()
-print(best_probe)
- 
+print(hbest_probe.y.min())
 
