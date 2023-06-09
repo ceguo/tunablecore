@@ -367,7 +367,7 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
 int estimate_cost(struct Tunable* pt)
 {
     int div_cost[] = {10, 20, 50, 100};
-    int base_cost = div_cost[pt->div_algo];
+    int base_cost = div_cost[pt->div_algo] + pt->bp_wrong_tol;
 
     int n_sets = 1 << pt->cache_setid_width;
     int line_sz = 1 << pt->cache_line_width;
@@ -434,14 +434,6 @@ int main(int argc, char *argv[]) {
             assert(fscanf(cfg, "%hhu", &tunable.cache_setid_width) == 1);
             assert(fscanf(cfg, "%hhu", &tunable.cache_line_width) == 1);
             assert(fscanf(cfg, "%hhu", &tunable.cache_n_ways) == 1);
-            
-            printf("Parameters overriden\n");
-            printf("Division algorithm: %hhu\n", tunable.div_algo);
-            printf("BP initial guess: %hhu\n", tunable.bp_init_guess);
-            printf("BP reverse tolerance: %u\n", tunable.bp_wrong_tol);
-            printf("Cache set ID width: %hhu\n", tunable.cache_setid_width);
-            printf("Cache line width: %hhu\n", tunable.cache_line_width);
-            printf("Cache ways: %hhu\n", tunable.cache_n_ways);
             fclose(cfg);
         }
 
