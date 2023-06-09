@@ -91,7 +91,7 @@ int cache_locate(Memory *m, memaddr_t addr)
 
     #ifdef __VERBOSE__
     memaddr_t offset = addr & (m->line_sz - 1);
-    printf("A: %u T: %u S: %u O: %u", addr, tag, setid, offset);
+    printf("A: %u Tag: %u Set: %u Offset: %u", addr, tag, setid, offset);
     #endif
 
     // Match tag in specific tag
@@ -165,7 +165,7 @@ bool memory_write(Memory *m, memaddr_t addr, cell_t val)
 }
 
 
-int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
+int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
 {
     // Word length
     const uint8_t ws = 4;
@@ -174,13 +174,13 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
     int ncyc = 0;
 
     // Registers
-    int32_t r[nreg] = {0};
+    cell_t r[nreg] = {0};
 
     // OS: free memory start point saved to last register
     r[nreg-1] = bsize / sizeof(uint32_t);
 
     // Code (eadian-independent)
-    char *bs = (char*)mem;
+    char *bs = (char*)(pmem->mc);
     int bsp = 0;
     
     // Branch predictor
@@ -258,13 +258,33 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
                     #ifdef __VERBOSE__
                     strcpy(first, "load");
                     #endif
-                    r[riz] = mem[r[rix] + r[riy]];
+                    // r[riz] = pmem->mc[r[rix] + r[riy]];
+                    r[riz] = memory_read(pmem, r[rix] + r[riy]);
+                    if (pmem->cache_hit == 0)
+                    {
+                        cache_stall = 4;
+                    }
+                    else
+                    {
+                        cache_stall = 0;
+                    }
+                    
                     break;
                 case 0b00100100:
                     #ifdef __VERBOSE__
                     strcpy(first, "store");
                     #endif
-                    mem[r[rix] + r[riy]] = r[riz];
+                    // pmem->mc[r[rix] + r[riy]] = r[riz];
+                    memory_write(pmem, r[rix] + r[riy], r[riz]);
+                    if (pmem->cache_hit == 0)
+                    {
+                        cache_stall = 4;
+                    }
+                    else
+                    {
+                        cache_stall = 0;
+                    }
+
                     break;
                 default:
                     #ifdef __VERBOSE__
@@ -344,6 +364,20 @@ int simulate(int32_t mem[], int32_t bsize, struct Tunable *pt)
 }
 
 
+int estimate_cost(struct Tunable* pt)
+{
+    int div_cost[] = {10, 20, 50, 100};
+    int base_cost = div_cost[pt->div_algo];
+
+    int n_sets = 1 << pt->cache_setid_width;
+    int line_sz = 1 << pt->cache_line_width;
+    int cache_sz = n_sets * line_sz * (pt->cache_n_ways);
+    int cache_cost = cache_sz * 5;
+
+    return base_cost + cache_cost;
+}
+
+
 int main(int argc, char *argv[]) {
     // Tunable parameters (hard-coded)
     struct Tunable tunable;
@@ -365,11 +399,6 @@ int main(int argc, char *argv[]) {
     // Memory content
     cell_t *mc;
     mc = calloc(nms, sizeof(cell_t));
-    // Cached data memory
-    Memory mem;
-
-    memory_init(&mem, mc, addr_w, tunable.cache_setid_width, tunable.cache_line_width, tunable.cache_n_ways);
-    srand(42);
 
     if (argc < 2) {
         printf("Usage: %s filename\n", argv[0]);
@@ -449,9 +478,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
+
+    // Cached data memory
+    Memory mem;
+    memory_init(&mem, mc, addr_w, tunable.cache_setid_width, tunable.cache_line_width, tunable.cache_n_ways);
+    srand(42);
+
     // Run simulation
-    int ncyc = simulate(mc, bsize, &tunable);
-    printf("%d\n", ncyc);
+    int ncyc = simulate(&mem, bsize, &tunable);
+    int hwcost = estimate_cost(&tunable);
+    #ifdef __VERBOSE__
+    printf("%d\n%d\n", ncyc, hwcost);
+    #endif
+    printf("%d\n", ncyc + hwcost);
 
     if (dump_flag == 1)
     {

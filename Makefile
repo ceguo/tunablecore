@@ -11,6 +11,7 @@ all:
 clean:
 	rm -rf bin/*
 	rm -rf tce/*
+	rm -rf mem/*
 
 examples:
 	bin/tcasm asm/sanity.asm tce/sanity.tce
