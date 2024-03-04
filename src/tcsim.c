@@ -8,6 +8,8 @@
 #define lsmax 16
 #define maxstrlen 1024
 
+//#define __VERBOSE__
+
 struct Tunable
 {
     // Division algorithm: [0] long division [1] restoring [2] SRT [3] Newton–Raphson 
@@ -165,7 +167,7 @@ bool memory_write(Memory *m, memaddr_t addr, cell_t val)
 }
 
 
-int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
+int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
 {
     // Word length
     const uint8_t ws = 4;
@@ -174,7 +176,13 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
     int ncyc = 0;
 
     // Registers
-    cell_t r[nreg] = {0};
+    cell_t r[nreg];
+    if (r_init == NULL)
+        for (int i = 0; i < nreg; i++)
+            r[i] = 0;
+    else
+        for (int i = 0; i < nreg; i++)
+            r[i] = r_init[i];
 
     // OS: free memory start point saved to last register
     r[nreg-1] = bsize / sizeof(uint32_t);
@@ -225,25 +233,49 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
                     strcpy(first, "nop");
                     #endif
                     break;
-                case 0b00000100:
+                case 0b00001000:
+                    #ifdef __VERBOSE__
+                    strcpy(first, "shl");
+                    #endif
+                    r[riz] = r[rix] << r[riy];
+                    break;
+                case 0b00001100:
+                    #ifdef __VERBOSE__
+                    strcpy(first, "shr");
+                    #endif
+                    r[riz] = r[rix] >> r[riy];
+                    break;
+                case 0b00010000:
+                    #ifdef __VERBOSE__
+                    strcpy(first, "bor");
+                    #endif
+                    r[riz] = r[rix] | r[riy];
+                    break;
+                case 0b00010100:
+                    #ifdef __VERBOSE__
+                    strcpy(first, "band");
+                    #endif
+                    r[riz] = r[rix] & r[riy];
+                    break;
+                case 0b00100000:
                     #ifdef __VERBOSE__
                     strcpy(first, "add");
                     #endif
                     r[riz] = r[rix] + r[riy];
                     break;
-                case 0b00001000:
+                case 0b00100100:
                     #ifdef __VERBOSE__
                     strcpy(first, "sub");
                     #endif
                     r[riz] = r[rix] - r[riy];
                     break;
-                case 0b00001100:
+                case 0b00110000:
                     #ifdef __VERBOSE__
                     strcpy(first, "mul");
                     #endif
                     r[riz] = r[rix] * r[riy];
                     break;
-                case 0b00010000:
+                case 0b01000000:
                     #ifdef __VERBOSE__
                     strcpy(first, "div");
                     #endif
@@ -254,7 +286,7 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
                     }
                     div_stall = div_stall_list[pt->div_algo];
                     break;
-                case 0b00100000:
+                case 0b10000000:
                     #ifdef __VERBOSE__
                     strcpy(first, "load");
                     #endif
@@ -270,7 +302,7 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
                     }
                     
                     break;
-                case 0b00100100:
+                case 0b10010000:
                     #ifdef __VERBOSE__
                     strcpy(first, "store");
                     #endif
@@ -353,12 +385,10 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt)
         #endif
     }
 
-    #ifdef __VERBOSE__
     for (int i = 0; i < nreg; i++)
     {
-        printf ("$%d = %d\n", i, r[i]);
+        printf ("Register %d %d\n", i, r[i]);
     }
-    #endif
 
     return ncyc;
 }
@@ -387,6 +417,8 @@ int main(int argc, char *argv[]) {
     tunable.cache_setid_width = 4;
     tunable.cache_line_width = 2;
     tunable.cache_n_ways = 3;
+
+    cell_t *r_init = NULL;
 
     int dump_flag = 0;
     char dump_file[maxstrlen];
@@ -437,6 +469,29 @@ int main(int argc, char *argv[]) {
             fclose(cfg);
         }
 
+        if (!strcmp(argv[i], "-r"))
+        {
+            if (argc < i + 2) {
+                printf("Error: register file not specified\n");
+                return 1;
+            }
+            FILE *mi = fopen(argv[i+1], "r");
+            if (mi == NULL) {
+                printf("Error: could not open register file %s\n", dump_file);
+                return 1;
+            }
+            char buf[maxstrlen];
+            r_init = calloc(nreg, sizeof(cell_t));
+            while (fgets(buf, maxstrlen, mi))
+            {
+                int add, val;
+                assert(sscanf(buf, "%d%d", &add, &val)==2);
+                // printf("Register %d: %d\n", add, val);
+                r_init[add] = val;
+            }
+            fclose(mi);
+        }
+
         if (!strcmp(argv[i], "-i"))
         {
             if (argc < i + 2) {
@@ -477,7 +532,7 @@ int main(int argc, char *argv[]) {
     srand(42);
 
     // Run simulation
-    int ncyc = simulate(&mem, bsize, &tunable);
+    int ncyc = simulate(&mem, bsize, &tunable, r_init);
     int hwcost = estimate_cost(&tunable);
     #ifdef __VERBOSE__
     printf("%d\n%d\n", ncyc, hwcost);
@@ -500,7 +555,8 @@ int main(int argc, char *argv[]) {
         }
         fclose(md);
     }
-
+    if (r_init != NULL)
+        free(r_init);
     free(mc);
     return 0;
 }

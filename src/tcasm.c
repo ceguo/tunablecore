@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define hmax 53
+#define hmax 997
 #define bmax 65536
 
 const uint32_t lsmax = 256;
@@ -52,12 +52,16 @@ int main(int argc, char *argv[]) {
 
     // tt = 00
     register_instruction("nop",   0b00000000);
-    register_instruction("add",   0b00000100);
-    register_instruction("sub",   0b00001000);
-    register_instruction("mul",   0b00001100);
-    register_instruction("div",   0b00010000);
-    register_instruction("load",  0b00100000);
-    register_instruction("store", 0b00100100);
+    register_instruction("shl",   0b00001000);
+    register_instruction("shr",   0b00001100);
+    register_instruction("bor",   0b00010000);
+    register_instruction("band",  0b00010100);
+    register_instruction("add",   0b00100000);
+    register_instruction("sub",   0b00100100);
+    register_instruction("mul",   0b00110000);
+    register_instruction("div",   0b01000000);
+    register_instruction("load",  0b10000000);
+    register_instruction("store", 0b10010000);
     
     // tt = 01
     // oott = 0001
@@ -65,7 +69,7 @@ int main(int argc, char *argv[]) {
     register_instruction("jp",    0b00110001);
 
     // oott = 0101
-    register_instruction("li", 0b00000101);
+    register_instruction("li",    0b00000101);
 
     if (argc != 3) {
         printf("Usage: %s <filename> <filename>\n", argv[0]);
