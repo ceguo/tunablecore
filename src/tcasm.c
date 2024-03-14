@@ -94,6 +94,11 @@ int main(int argc, char *argv[]) {
         uint16_t riz, rix, riy;
         int16_t imm;
 
+        if (!hash_to_op_used[h])
+        {
+            printf("Cannot understand instruction: %s\n", first);
+        }
+
         #ifdef __VERBOSE__
         printf("%s   op:%u", line, op);
         #endif

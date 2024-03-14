@@ -7,6 +7,7 @@
 #define nreg 16
 #define lsmax 16
 #define maxstrlen 1024
+#define maxcycles 100000
 
 //#define __VERBOSE__
 
@@ -202,7 +203,7 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
     int div_stall_list[] = {5, 3, 1, 0};
 
     // Intrepretation
-    while (bsp < bsize)
+    while (bsp < bsize && ncyc < maxcycles)
     {
         bp_stall = 0;
         div_stall = 0;
