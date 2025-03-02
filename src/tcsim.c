@@ -9,7 +9,8 @@
 #define maxstrlen 1024
 #define maxcycles 100000
 
-//#define __VERBOSE__
+// Remove the compile-time verbose flag
+// #define __VERBOSE__
 
 struct Tunable
 {
@@ -62,6 +63,11 @@ struct Memory
     bool cache_hit;
 };
 
+// Updated function prototypes
+int cache_locate(Memory *m, memaddr_t addr, int verbose_flag);
+cell_t memory_read(Memory *m, memaddr_t addr, int verbose_flag);
+bool memory_write(Memory *m, memaddr_t addr, cell_t val, int verbose_flag);
+int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init, int verbose_flag);
 
 int memory_init(Memory *m, cell_t *content, int addr_w, int setid_w, int line_w, int n_ways)
 {
@@ -85,17 +91,17 @@ int memory_init(Memory *m, cell_t *content, int addr_w, int setid_w, int line_w,
 }
 
 
-int cache_locate(Memory *m, memaddr_t addr)
+int cache_locate(Memory *m, memaddr_t addr, int verbose_flag)
 {
     memaddr_t tag = (addr >> (m->line_w + m->setid_w));
     memaddr_t setid = (addr >> m->line_w) & (m->n_sets - 1);
     
     m->last_addr = addr;
 
-    #ifdef __VERBOSE__
-    memaddr_t offset = addr & (m->line_sz - 1);
-    printf("A: %u Tag: %u Set: %u Offset: %u", addr, tag, setid, offset);
-    #endif
+    if (verbose_flag) {
+        memaddr_t offset = addr & (m->line_sz - 1);
+        printf("A: %u Tag: %u Set: %u Offset: %u", addr, tag, setid, offset);
+    }
 
     // Match tag in specific tag
     memaddr_t line_match = m->n_ways;
@@ -108,18 +114,18 @@ int cache_locate(Memory *m, memaddr_t addr)
     if (line_match < m->n_ways)
     {
         // Hit: increment line frequency
-        #ifdef __VERBOSE__
-        printf(" Hit\n");
-        #endif
+        if (verbose_flag) {
+            printf(" Hit\n");
+        }
         m->cache_hit = 1;
         return 1;
     }
     else
     {
         // Miss: random replacement
-        #ifdef __VERBOSE__
-        printf(" Miss\n");
-        #endif
+        if (verbose_flag) {
+            printf(" Miss\n");
+        }
         m->cache_hit = 0;
 
         memaddr_t line_least = rand()%(m->n_ways);
@@ -145,9 +151,9 @@ void cache_inspect(Memory *m){
     }
 }
 
-cell_t memory_read(Memory *m, memaddr_t addr)
+cell_t memory_read(Memory *m, memaddr_t addr, int verbose_flag)
 {
-    cache_locate(m, addr);
+    cache_locate(m, addr, verbose_flag);
     if (addr < m->mem_sz)
         return m->mc[addr];
 
@@ -155,9 +161,9 @@ cell_t memory_read(Memory *m, memaddr_t addr)
 }
 
 
-bool memory_write(Memory *m, memaddr_t addr, cell_t val)
+bool memory_write(Memory *m, memaddr_t addr, cell_t val, int verbose_flag)
 {
-    cache_locate(m, addr);
+    cache_locate(m, addr, verbose_flag);
     if (addr < m->mem_sz)
     {
         m->mc[addr] = val;
@@ -168,7 +174,7 @@ bool memory_write(Memory *m, memaddr_t addr, cell_t val)
 }
 
 
-int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
+int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init, int verbose_flag)
 {
     // Word length
     const uint8_t ws = 4;
@@ -209,9 +215,11 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
         div_stall = 0;
         cache_stall = 0;
 
-        #ifdef __VERBOSE__
         char first[lsmax];
-        #endif
+        if (verbose_flag) {
+            // Initialize first only if verbose mode is on
+            first[0] = '\0';
+        }
         
         // Coarse-grained decoding
         uint8_t b0 = bs[bsp], b1 = bs[bsp+1], b2 = bs[bsp+2], b3 = bs[bsp+3];
@@ -230,56 +238,38 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
             switch (b0)
             {
                 case 0b00000000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "nop");
-                    #endif
+                    if (verbose_flag) strcpy(first, "nop");
                     break;
                 case 0b00001000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "shl");
-                    #endif
+                    if (verbose_flag) strcpy(first, "shl");
                     r[riz] = r[rix] << r[riy];
                     break;
                 case 0b00001100:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "shr");
-                    #endif
+                    if (verbose_flag) strcpy(first, "shr");
                     r[riz] = r[rix] >> r[riy];
                     break;
                 case 0b00010000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "bor");
-                    #endif
+                    if (verbose_flag) strcpy(first, "bor");
                     r[riz] = r[rix] | r[riy];
                     break;
                 case 0b00010100:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "band");
-                    #endif
+                    if (verbose_flag) strcpy(first, "band");
                     r[riz] = r[rix] & r[riy];
                     break;
                 case 0b00100000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "add");
-                    #endif
+                    if (verbose_flag) strcpy(first, "add");
                     r[riz] = r[rix] + r[riy];
                     break;
                 case 0b00100100:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "sub");
-                    #endif
+                    if (verbose_flag) strcpy(first, "sub");
                     r[riz] = r[rix] - r[riy];
                     break;
                 case 0b00110000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "mul");
-                    #endif
+                    if (verbose_flag) strcpy(first, "mul");
                     r[riz] = r[rix] * r[riy];
                     break;
                 case 0b01000000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "div");
-                    #endif
+                    if (verbose_flag) strcpy(first, "div");
                     // Skip instruction if register riy is 0
                     if (r[riy] != 0)
                     {
@@ -288,11 +278,8 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
                     div_stall = div_stall_list[pt->div_algo];
                     break;
                 case 0b10000000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "load");
-                    #endif
-                    // r[riz] = pmem->mc[r[rix] + r[riy]];
-                    r[riz] = memory_read(pmem, r[rix] + r[riy]);
+                    if (verbose_flag) strcpy(first, "load");
+                    r[riz] = memory_read(pmem, r[rix] + r[riy], verbose_flag);
                     if (pmem->cache_hit == 0)
                     {
                         cache_stall = 4;
@@ -304,11 +291,8 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
                     
                     break;
                 case 0b10010000:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "store");
-                    #endif
-                    // pmem->mc[r[rix] + r[riy]] = r[riz];
-                    memory_write(pmem, r[rix] + r[riy], r[riz]);
+                    if (verbose_flag) strcpy(first, "store");
+                    memory_write(pmem, r[rix] + r[riy], r[riz], verbose_flag);
                     if (pmem->cache_hit == 0)
                     {
                         cache_stall = 4;
@@ -320,9 +304,7 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
 
                     break;
                 default:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "unknown");
-                    #endif
+                    if (verbose_flag) strcpy(first, "unknown");
                     break;
             }
         }
@@ -331,29 +313,21 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
             switch (b0)
             {
                 case 0b00100001:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "jz");
-                    #endif
+                    if (verbose_flag) strcpy(first, "jz");
                     bp_active = 1;
                     take_branch = (r[riz] == 0);
                     break;
                 case 0b00110001:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "jp");
-                    #endif
+                    if (verbose_flag) strcpy(first, "jp");
                     bp_active = 1;
                     take_branch = (r[riz] > 0);
                     break;
                 case 0b00000101:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "li");
-                    #endif
+                    if (verbose_flag) strcpy(first, "li");
                     r[riz] = (int32_t)imm;
                     break;
                 default:
-                    #ifdef __VERBOSE__
-                    strcpy(first, "unknown");
-                    #endif
+                    if (verbose_flag) strcpy(first, "unknown");
                     break;
             }
         }
@@ -381,9 +355,10 @@ int simulate(Memory *pmem, int32_t bsize, struct Tunable *pt, cell_t *r_init)
         bsp = bsp + ws * (take_branch ? imm : 1);
         ncyc += 1 + bp_stall + div_stall + cache_stall;
         
-        #ifdef __VERBOSE__
-        printf("%u: %s\t[%2hu %2hu %2hu] %6hd B%hhu (%d)\n", bsp, first, riz, rix, riy, imm, take_branch, ncyc);
-        #endif
+        if (verbose_flag) {
+            printf("%u: %s\t[%2hu %2hu %2hu] %6hd B%hhu (cycle: %d)\n", 
+                   bsp, first, riz, rix, riy, imm, take_branch, ncyc);
+        }
     }
 
     for (int i = 0; i < nreg; i++)
@@ -423,6 +398,9 @@ int main(int argc, char *argv[]) {
 
     int dump_flag = 0;
     char dump_file[maxstrlen];
+    
+    // Add verbose flag
+    int verbose_flag = 0;
 
     const uint32_t addr_w = 14;
     // Maximum code size
@@ -524,6 +502,11 @@ int main(int argc, char *argv[]) {
             dump_flag = 1;
             strcpy(dump_file, argv[i+1]);
         }
+        
+        if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose"))
+        {
+            verbose_flag = 1;
+        }
     }
 
 
@@ -533,12 +516,14 @@ int main(int argc, char *argv[]) {
     srand(42);
 
     // Run simulation
-    int ncyc = simulate(&mem, bsize, &tunable, r_init);
+    int ncyc = simulate(&mem, bsize, &tunable, r_init, verbose_flag);
     int hwcost = estimate_cost(&tunable);
-    #ifdef __VERBOSE__
-    printf("%d\n%d\n", ncyc, hwcost);
-    #endif
-    printf("%d\n", ncyc + hwcost);
+    
+    if (verbose_flag)
+    {
+        printf("%d\n%d\n", ncyc, hwcost);
+    }
+    printf("%d\n", ncyc);
 
     if (dump_flag == 1)
     {
